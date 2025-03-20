@@ -6,26 +6,44 @@
  */
 function concurRequest(tasks, count) {
   return new Promise((resolve) => {
-    const n = tasks.length
-    let finishCount = 0
-    let index = 0
-    const results: any[] = []
+    const n = tasks.length;
+    if (n === 0) {
+      resolve([]);
+      return;
+    }
+    let finishCount = 0;
+    let index = 0;
+    const results: any[] = [];
+    const queue: Promise<void>[] = [];
+
     async function _request() {
       if (index >= n) {
-        return
+        return;
       }
-      const i = index
-      const task = tasks[index++]
-      const resp = await task()
-      results[i] = resp
-      finishCount++
+      const i = index;
+      const task = tasks[index++];
+      try {
+        const resp = await task();
+        results[i] = resp;
+      } catch (error) {
+        results[i] = error;
+      }
+      finishCount++;
       if (finishCount === n) {
-        resolve(results)
+        resolve(results);
+      } else {
+        queue.push(_request());
       }
-      _request()
     }
-    for (let i = 0; i < Math.max(count, n); i++) {
-      _request()
+
+    for (let i = 0; i < Math.min(count, n); i++) {
+      queue.push(_request());
     }
-  })
+
+    Promise.all(queue).then(() => {
+      if (finishCount === n) {
+        resolve(results);
+      }
+    });
+  });
 }
